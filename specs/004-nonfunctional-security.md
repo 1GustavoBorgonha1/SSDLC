@@ -53,7 +53,7 @@ revisados, 0 bugs `Blocker`/`Critical`, cobertura ≥ 80%, duplicação ≤ 3%.
 
 | ID | Controle |
 |---|---|
-| INF-S1 | Security Group: `22/tcp` restrito a `ssh_allowed_cidr` (nunca `0.0.0.0/0` por padrão), `80/tcp` público, egresso livre |
+| INF-S1 | Security Group: `80/tcp` público, egresso livre. `22/tcp` controlado por `ssh_allowed_cidr` — restrito ao IP do operador para deploy manual, ou `0.0.0.0/0` quando o deploy é feito por SSH a partir dos runners do GitHub Actions (sem CIDR pequeno e estável para liberar). Mitigação: autenticação exclusivamente por chave, sem senha (padrão do Amazon Linux 2023). Ver `infra/terraform/variables.tf`. |
 | INF-S2 | IMDSv2 obrigatório (`http_tokens = "required"`) — bloqueia SSRF contra o metadata |
 | INF-S3 | Volume EBS raiz criptografado |
 | INF-S4 | Acesso por par de chaves SSH; sem senha; sem credencial AWS dentro da instância |

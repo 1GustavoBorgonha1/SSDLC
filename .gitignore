@@ -15,3 +15,4 @@ infra/terraform/*.tfstate.*
 infra/terraform/*.tfvars
 !infra/terraform/*.tfvars.example
 *.pem
+infra/terraform/tfplan*

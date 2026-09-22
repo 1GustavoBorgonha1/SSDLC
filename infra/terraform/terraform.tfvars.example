@@ -5,5 +5,14 @@ instance_type    = "t3.micro"
 # Cole aqui o conteúdo de ~/.ssh/salafacil.pub
 ssh_public_key   = "ssh-ed25519 AAAA... aluno@universidade"
 
-# INF-S1 — apenas o seu IP. Descubra com: curl -s https://checkip.amazonaws.com
-ssh_allowed_cidr = "203.0.113.10/32"
+# INF-S1 — restrinja ao seu IP para deploy manual:
+#   curl -s https://checkip.amazonaws.com
+# Use "0.0.0.0/0" se o deploy for automatizado via GitHub Actions fazendo SSH
+# (ver justificativa completa em variables.tf: os runners do GitHub nao tem
+# um CIDR pequeno e estavel para liberar).
+ssh_allowed_cidr = "0.0.0.0/0"
+
+# CKV2_AWS_41 — em contas AWS Academy Learner Lab, use "LabInstanceProfile"
+# (já existe; a conta não permite criar roles novas). Fora da Academy, aponte
+# para um profile próprio com permissões mínimas, ou defina null.
+instance_profile_name = "LabInstanceProfile"

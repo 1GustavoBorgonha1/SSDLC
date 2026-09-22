@@ -1,0 +1,20 @@
+# Configuração do Gitleaks (SEC-4, SPEC-004 §3).
+# Estende o conjunto de regras padrão e só ajusta o allowlist: nenhuma regra
+# de detecção é desabilitada.
+title = "gitleaks config — SalaFácil"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders e segredos de teste que nunca são credenciais reais"
+regexes = [
+  # app/src/config.ts — valor de exemplo que o próprio código recusa (NFR-S3).
+  '''troque-este-valor-por-um-segredo-de-32-ou-mais-caracteres''',
+  # app/tests/helpers.ts — segredo fixo usado só para assinar JWT em teste.
+  '''segredo-de-teste-com-mais-de-32-caracteres-ok''',
+]
+paths = [
+  # .env.example nunca contém segredo real, apenas o mesmo placeholder acima.
+  '''\.env\.example$''',
+]
