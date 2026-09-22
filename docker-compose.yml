@@ -1,0 +1,46 @@
+# Execução local e na EC2 (SPEC-006 §1 e §3).
+services:
+  app:
+    # Em produção o deploy troca por ghcr.io/<org>/<repo>:sha-<commit>.
+    image: ${APP_IMAGE:-salafacil:local}
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    container_name: salafacil
+    restart: unless-stopped
+    ports:
+      - "80:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      DATABASE_FILE: /data/salafacil.db
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      APP_VERSION: ${APP_VERSION:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - salafacil-data:/data
+    # NFR-S12 — filesystem imutável exceto o volume de dados.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  salafacil-data:

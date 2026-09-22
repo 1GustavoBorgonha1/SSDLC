@@ -1,0 +1,96 @@
+:root {
+  color-scheme: light dark;
+  --ink: #16181d;
+  --paper: #f7f7f5;
+  --line: #d7d8d3;
+  --accent: #1f5f4b;
+  --danger: #a12b2b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+header h1 { margin: 0; font-size: 20px; color: var(--accent); }
+header p { margin: 0; color: #5d6068; }
+
+main { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+
+h2 { font-size: 16px; margin: 28px 0 12px; }
+
+form {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+form button { grid-column: 2; justify-self: start; }
+
+input, select, button {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+
+button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.1); }
+
+.filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { background: #eef0ec; font-weight: 600; }
+tbody tr:last-child td { border-bottom: none; }
+td button { background: var(--danger); border-color: var(--danger); padding: 4px 8px; }
+
+#message { min-height: 1.5em; font-weight: 600; }
+#message.error { color: var(--danger); }
+#message.ok { color: var(--accent); }
+
+@media (max-width: 600px) {
+  form { grid-template-columns: 1fr; }
+  form button { grid-column: 1; }
+}

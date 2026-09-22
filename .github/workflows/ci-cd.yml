@@ -1,0 +1,241 @@
+# Pipeline SSDLC — SPEC-006 §2. Portões de segurança SEC-1 a SEC-6 (SPEC-004 §3).
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  quality:
+    name: Qualidade e SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # o Sonar precisa do histórico para "código novo"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: app
+        run: npm ci
+
+      - name: Portão SDD — matriz de rastreabilidade
+        working-directory: app
+        run: npm run verify:traceability
+
+      - name: Lint
+        working-directory: app
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: app
+        run: npm run typecheck
+
+      - name: Testes de aceite com cobertura
+        working-directory: app
+        env:
+          JWT_SECRET: ci-secret-com-mais-de-32-caracteres-para-os-testes
+        run: npm run test:coverage
+
+      - name: SEC-2 — dependências vulneráveis
+        working-directory: app
+        run: npm audit --audit-level=high
+
+      - name: SEC-4 — segredos commitados (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SEC-1 — SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SEC-1 — aguardar o Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  iac-scan:
+    name: SEC-5 — IaC (Checkov)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infra/terraform
+          framework: terraform
+          soft_fail: false
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+
+      - name: SEC-6 — publicar SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+        continue-on-error: true
+
+  build:
+    name: Build e scan da imagem
+    needs: [quality, iac-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: echo "image=${IMAGE_NAME,,}:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ steps.meta.outputs.image }}
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: SEC-3 — Trivy na imagem
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.meta.outputs.image }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: SEC-6 — Trivy em formato SARIF
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.meta.outputs.image }}
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+        continue-on-error: true
+
+      - name: Login no GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar imagem (só na main, só depois dos portões)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ env.IMAGE_NAME }}:latest
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+
+  deploy:
+    # INF-S5 — as credenciais de deploy vêm dos segredos do repositório.
+    name: Deploy na EC2
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enviar docker-compose.yml para a instância
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: docker-compose.yml
+          target: /opt/salafacil
+
+      - name: Subir a nova versão e validar
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_IMAGE: ${{ needs.build.outputs.image }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: APP_IMAGE
+          script: |
+            set -euo pipefail
+            cd /opt/salafacil
+
+            # Guarda a imagem atual para rollback (SPEC-006 §3).
+            PREVIOUS=$(docker inspect --format '{{.Config.Image}}' salafacil 2>/dev/null || echo "")
+
+            # printf em vez de heredoc: o script chega indentado ao shell remoto.
+            umask 077
+            {
+              printf 'APP_IMAGE=%s\n' "${APP_IMAGE}"
+              printf 'APP_VERSION=%s\n' "${APP_IMAGE##*:}"
+              printf 'JWT_SECRET=%s\n' '${{ secrets.APP_JWT_SECRET }}'
+              printf 'CORS_ORIGIN=http://%s\n' '${{ secrets.EC2_HOST }}'
+              printf 'LOG_LEVEL=info\n'
+            } > .env
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            # Smoke test do /health (FR-10); rollback automático se falhar.
+            for i in $(seq 1 15); do
+              if curl -fsS http://127.0.0.1/health | grep -q '"status":"ok"'; then
+                echo "deploy ok"
+                docker image prune -f
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "smoke test falhou; revertendo para ${PREVIOUS:-nenhuma imagem anterior}"
+            if [ -n "$PREVIOUS" ]; then
+              sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${PREVIOUS}|" .env
+              docker compose up -d
+            fi
+            exit 1

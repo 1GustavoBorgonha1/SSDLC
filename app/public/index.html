@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SalaFácil — Reserva de Salas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>SalaFácil</h1>
+      <p id="session">não autenticado</p>
+      <button id="logout" type="button" hidden>Sair</button>
+    </header>
+
+    <main>
+      <section id="login-view">
+        <h2>Entrar</h2>
+        <form id="login-form">
+          <label for="email">E-mail</label>
+          <input id="email" name="email" type="email" autocomplete="username" required />
+          <label for="password">Senha</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+          <button type="submit">Entrar</button>
+        </form>
+      </section>
+
+      <section id="app-view" hidden>
+        <h2>Nova reserva</h2>
+        <form id="reservation-form">
+          <label for="room">Sala</label>
+          <select id="room" name="room" required></select>
+          <label for="purpose">Finalidade</label>
+          <input id="purpose" name="purpose" type="text" minlength="3" maxlength="200" required />
+          <label for="date">Data</label>
+          <input id="date" name="date" type="date" required />
+          <label for="start">Início</label>
+          <input id="start" name="start" type="time" step="1800" value="13:00" required />
+          <label for="end">Fim</label>
+          <input id="end" name="end" type="time" step="1800" value="15:00" required />
+          <button type="submit">Reservar</button>
+        </form>
+
+        <h2>Agenda do dia</h2>
+        <div class="filters">
+          <label for="filter-room">Sala</label>
+          <select id="filter-room"></select>
+          <label for="filter-date">Data</label>
+          <input id="filter-date" type="date" />
+          <button id="refresh" type="button">Atualizar</button>
+        </div>
+        <table id="agenda">
+          <thead>
+            <tr>
+              <th>Sala</th>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Finalidade</th>
+              <th>Responsável</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <p id="message" role="status"></p>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
