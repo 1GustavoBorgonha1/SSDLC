@@ -64,4 +64,17 @@ describe('operacional', () => {
 
     assert.equal(response.headers['strict-transport-security'], undefined);
   });
+
+  it('NFR-S7: CSP não envia upgrade-insecure-requests (a v1 é servida em HTTP puro)', async () => {
+    // Essa diretiva instrui o navegador a recarregar todo subrecurso
+    // (app.js, styles.css) via HTTPS. Sem TLS na frente isso falha
+    // silenciosamente: o HTML principal carrega, mas a página fica sem
+    // estilo e sem script — mesma causa raiz do HSTS acima.
+    const response = await ctx.app.inject({ method: 'GET', url: '/' });
+
+    assert.doesNotMatch(
+      response.headers['content-security-policy'] as string,
+      /upgrade-insecure-requests/,
+    );
+  });
 });

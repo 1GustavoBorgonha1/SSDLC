@@ -40,6 +40,12 @@ export async function buildServer(db: Db, config: AppConfig): Promise<FastifyIns
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
+        // helmet inclui upgrade-insecure-requests por padrão: instrui o
+        // navegador a recarregar todo subrecurso (app.js, styles.css) via
+        // HTTPS. Sem TLS na frente (SPEC-006 §1) isso falha silenciosamente
+        // e deixa a página em branco, mesmo com o HTML principal servido
+        // normalmente. Desativado junto com hsts (mesma causa raiz).
+        upgradeInsecureRequests: null,
       },
     },
     // A v1 é servida em HTTP puro (SPEC-006 §1, sem TLS na frente). Enviar
