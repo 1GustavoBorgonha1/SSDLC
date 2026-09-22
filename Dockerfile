@@ -31,6 +31,13 @@ COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node app/public ./public
 
+# SEC-3 — remove o npm CLI global da imagem base: o runtime só executa
+# `node dist/main.js`, nunca `npm`, e o npm embutido carrega dependências
+# próprias (tar, brace-expansion, sigstore) que ficam desatualizadas na
+# imagem base do Node e disparam CVEs no Trivy sem afetar a aplicação.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+           /usr/local/lib/node_modules/corepack /usr/local/bin/corepack
+
 # NFR-S12 — o processo roda como o usuário `node`, já presente na imagem base.
 RUN install -d -o node -g node /data
 USER node
