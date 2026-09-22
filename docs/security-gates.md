@@ -14,7 +14,7 @@ antes de qualquer imagem chegar à AWS.
 
 ## Configurar o SonarQube (SEC-1)
 
-### Opção A — SonarCloud (mais rápido para a entrega)
+### Opção A — SonarCloud (mais rápido; não é o que esta entrega usa)
 
 1. `sonarcloud.io` → importe o repositório do GitHub.
 2. Copie a `projectKey` e a `organization` para `sonar-project.properties`:
@@ -25,20 +25,39 @@ antes de qualquer imagem chegar à AWS.
 3. Gere um token em `My Account → Security` e salve como `SONAR_TOKEN`.
 4. Não defina `SONAR_HOST_URL` (a action assume o SonarCloud).
 
-### Opção B — SonarQube próprio (ex.: em outra EC2)
+### Opção B — SonarQube próprio na mesma EC2 (usado nesta entrega)
+
+O container roda **só em `127.0.0.1:9000`** — nunca exposto à internet, nem
+via Security Group. A pipeline chega até ele por um túnel SSH que reaproveita
+a mesma chave do deploy (`EC2_SSH_KEY`), sem abrir porta nova nenhuma:
 
 ```bash
-docker run -d --name sonarqube -p 9000:9000 \
+# na EC2 — antes disso, garanta swap e vm.max_map_count (o Elasticsearch
+# embutido do SonarQube exige >= 262144 e o t3.micro tem só 916 MB de RAM):
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+sudo sysctl -w vm.max_map_count=262144
+
+docker run -d --name sonarqube --restart unless-stopped \
+  -p 127.0.0.1:9000:9000 \
+  -e SONAR_SEARCH_JAVAOPTS="-Xms512m -Xmx512m" \
+  -e SONAR_WEB_JAVAOPTS="-Xmx256m -Xms128m" \
+  -e SONAR_CE_JAVAOPTS="-Xmx256m -Xms128m" \
   -v sonarqube_data:/opt/sonarqube/data \
   -v sonarqube_extensions:/opt/sonarqube/extensions \
+  --ulimit nofile=131072:131072 --ulimit nproc=8192:8192 \
   sonarqube:community
 ```
 
-Login inicial `admin/admin` (troque a senha). Crie o projeto `salafacil`,
-gere um token e defina `SONAR_TOKEN` + `SONAR_HOST_URL` nos segredos.
+Login inicial `admin/admin` (a API recusa esse par nas primeiras requisições
+autenticadas — troque a senha e gere o token via `/api/user_tokens/generate`).
+Crie o projeto `salafacil`, gere um token e salve só como `SONAR_TOKEN`
+(`SONAR_HOST_URL` fica fixo em `http://localhost:9000` no workflow, atrás do
+túnel — não é segredo, não precisa de secret).
 
-> Restrinja a porta 9000 ao seu IP: um SonarQube exposto entrega o código-fonte
-> inteiro a quem passar.
+O job `Qualidade e SAST` do workflow abre o túnel antes do scan
+(`ssh -f -N -L 127.0.0.1:9000:127.0.0.1:9000 ec2-user@$EC2_HOST`) e espera
+`/api/system/status` responder `UP` antes de prosseguir.
 
 ### Quality Gate exigido
 

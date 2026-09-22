@@ -64,18 +64,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # O SonarQube roda self-hosted na mesma EC2 do deploy, acessível só via
+      # localhost (nunca exposto na internet). O runner alcança-o por um túnel
+      # SSH reaproveitando a chave de deploy — nenhuma porta nova é aberta no
+      # Security Group.
+      - name: SEC-1 — abrir túnel SSH para o SonarQube
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
+            -f -N -L 127.0.0.1:9000:127.0.0.1:9000 "ec2-user@${EC2_HOST}"
+          for i in $(seq 1 15); do
+            curl -fsS http://127.0.0.1:9000/api/system/status | grep -q '"status":"UP"' && exit 0
+            sleep 2
+          done
+          echo "SonarQube não respondeu através do túnel a tempo" >&2
+          exit 1
+
       - name: SEC-1 — SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: http://localhost:9000
 
       - name: SEC-1 — aguardar o Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: http://localhost:9000
 
   iac-scan:
     name: SEC-5 — IaC (Checkov)
