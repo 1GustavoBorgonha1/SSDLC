@@ -35,6 +35,7 @@ no arquivo de teste indicados.
 | NFR-S4 | 004 §2 | `app/src/domain/users.ts` | `app/tests/auth.test.ts` |
 | NFR-S5 | 004 §2 | `app/src/http/server.ts` | `app/tests/health.test.ts` |
 | NFR-S6 | 004 §2 | `app/src/infra/db.ts` | `app/tests/rooms.test.ts` |
+| NFR-S7 | 004 §2 | `app/src/http/server.ts` | `app/tests/health.test.ts` |
 | NFR-S10 | 004 §2 | `app/src/http/errors.ts` | `app/tests/auth.test.ts` |
 | AC-1..AC-3 | 005 | — | `app/tests/auth.test.ts` |
 | AC-4, AC-5 | 005 | — | `app/tests/rooms.test.ts` |

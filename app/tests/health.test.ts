@@ -55,4 +55,13 @@ describe('operacional', () => {
     assert.match(response.body, /SalaFácil/);
     assert.match(response.headers['content-security-policy'] as string, /default-src 'self'/);
   });
+
+  it('NFR-S7: não envia Strict-Transport-Security (a v1 é servida em HTTP puro)', async () => {
+    // Enviar HSTS sobre HTTP faz o navegador memorizar "sempre HTTPS" para o
+    // host e passar a recusar a própria origem — página em branco sem erro
+    // visível. Reative junto com TLS (ver app/src/http/server.ts).
+    const response = await ctx.app.inject({ method: 'GET', url: '/health' });
+
+    assert.equal(response.headers['strict-transport-security'], undefined);
+  });
 });

@@ -42,6 +42,12 @@ export async function buildServer(db: Db, config: AppConfig): Promise<FastifyIns
         baseUri: ["'self'"],
       },
     },
+    // A v1 é servida em HTTP puro (SPEC-006 §1, sem TLS na frente). Enviar
+    // Strict-Transport-Security sobre HTTP faz o navegador memorizar uma
+    // política de "sempre HTTPS" para o host e passar a recusar a própria
+    // origem HTTP em visitas seguintes — página em branco sem nenhum erro
+    // visível. Reative quando houver TLS (ALB/reverse proxy com certificado).
+    hsts: false,
   });
 
   // NFR-S8 — origem exata, nunca "*" em produção (validado em config.ts).
